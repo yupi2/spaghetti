@@ -188,40 +188,51 @@ end
 local ZAxis = Vector(0,0,1);
 
 function ENT:PhysicsSimulate( phys, deltatime )
-	self.BackPos = self:GetPos()+self:GetForward()*100;
-	self.FrontPos = self:GetPos()+self:GetForward()*-145;
-	self.MiddlePos = self:GetPos();
-	if(self.Inflight) then
+	local myPos = self:GetPos()
+	local myForward = self:GetForward()
+	local myTable = self:GetTable()
+	myTable.BackPos = myPos+myForward*100
+	myTable.FrontPos = myPos+myForward*-145
+	myTable.MiddlePos = myPos
+
+	local skip_trace = false
+	if(myTable.Inflight) then
 		local UP = ZAxis;
-		self.RightDir = self.Entity:GetForward():Cross(UP):GetNormalized();
-		self.FWDDir = self.Entity:GetForward();
+		myTable.RightDir = myForward:Cross(UP):GetNormalized();
+		myTable.FWDDir = myForward;
 
-		if(IsValid(self.Pilot)) then
-			if(self.Pilot:KeyDown(IN_JUMP)) then
-				self.Right = -500;
-			elseif(self.Pilot:KeyDown(IN_WALK)) then
-				self.Right = 500;
+		local pilot = myTable.Pilot
+		local Right
+		if(IsValid(pilot)) then
+			if(pilot:KeyDown(IN_JUMP)) then
+				Right = -500;
+			elseif(pilot:KeyDown(IN_WALK)) then
+				Right = 500;
 			else
-				self.Right = 0;
+				Right = 0;
 			end
+			myTable.Right = Right
 		end
-		self.Accel.RIGHT = math.Approach(self.Accel.RIGHT,self.Right,5);
+		local myAccel = myTable.Accel
+		myAccel.RIGHT = math.Approach(myAccel.RIGHT,Right,5);
 		
 
-		
+		skip_trace = true
 		self:RunTraces();
 
-		self.ExtraRoll = Angle(0,0,self.YawAccel / 4);
-		if(!self.WaterTrace.Hit) then
-			if(self.FrontTrace.HitPos.z >= self.BackTrace.HitPos.z) then
-				self.PitchMod = Angle(math.Clamp((self.BackTrace.HitPos.z - self.FrontTrace.HitPos.z),-45,45)/3*-1,0,0)
+		myTable.ExtraRoll = Angle(0,0,myTable.YawAccel / 4);
+		if(!myTable.WaterTrace.Hit) then
+			local FrontTrace_HitPos_z = myTable.FrontTrace.HitPos.z
+			local BackTrace_HitPos_z = myTable.BackTrace.HitPos.z
+			if(FrontTrace_HitPos_z >= BackTrace_HitPos_z) then
+				myAccel.PitchMod = Angle(math.Clamp((BackTrace_HitPos_z - FrontTrace_HitPos_z),-45,45)/3*-1,0,0)
 			else
-				self.PitchMod = Angle(math.Clamp(-(self.FrontTrace.HitPos.z - self.BackTrace.HitPos.z),-45,45)/3*-1,0,0)
+				myAccel.PitchMod = Angle(math.Clamp(-(FrontTrace_HitPos_z - BackTrace_HitPos_z),-45,45)/3*-1,0,0)
 			end
 		end
 	end
 
-	self.BaseClass.PhysicsSimulate(self,phys,deltatime);
+	self.BaseClass.PhysicsSimulate(self,phys,deltatime,skip_trace);
 	
 
 end

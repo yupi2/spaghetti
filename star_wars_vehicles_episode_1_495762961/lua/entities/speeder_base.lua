@@ -504,31 +504,40 @@ end
 
 
 function ENT:RunTraces()
-	self.FrontTrace = util.TraceLine({
-		start = self.FrontPos,
-		endpos = self.FrontPos + self:GetUp()*-10000,
-		filter = {self,self.DriverChair,self.PassengerChair},
+	local endpos_thing = self:GetUp()*-10000
+	local myTable = self:GetTable()
+	local filter = {self,myTable.DriverChair,myTable.PassengerChair}
+
+	local FrontPos = myTable.FrontPos
+	local FrontPos_endpos = FrontPos + endpos_thing
+	local BackPos = myTable.BackPos
+	local MiddlePos = myTable.MiddlePos
+
+	myTable.FrontTrace = util.TraceLine({
+		start = FrontPos,
+		endpos = FrontPos_endpos,
+		filter = filter,
 		mask = MASK_SOLID,
 	});
 	
-	self.BackTrace = util.TraceLine({
-		start = self.BackPos,
-		endpos = self.BackPos + self:GetUp()*-10000,
-		filter = {self,self.DriverChair,self.PassengerChair},
+	myTable.BackTrace = util.TraceLine({
+		start = BackPos,
+		endpos = BackPos + endpos_thing,
+		filter = filter,
 		mask = MASK_SOLID,		
 	});
 	
-	self.MiddleTrace = util.TraceLine({
-		start = self.MiddlePos,
-		endpos = self.MiddlePos + self:GetUp()*-10000,
-		filter = {self,self.DriverChair,self.PassengerChair},
+	myTable.MiddleTrace = util.TraceLine({
+		start = MiddlePos,
+		endpos = MiddlePos + endpos_thing,
+		filter = filter,
 		mask = MASK_SOLID,
 	});
 	
-	self.WaterTrace = util.TraceLine({
-		start = self.FrontPos,
-		endpos = self.FrontPos + self:GetUp()*-10000,
-		filter = {self,self.DriverChair,self.PassengerChair},
+	myTable.WaterTrace = util.TraceLine({
+		start = FrontPos,
+		endpos = FrontPos_endpos,
+		filter = filter,
 		mask = MASK_WATER,
 	});
 	
@@ -547,18 +556,23 @@ local ZAxis = Vector(0,0,1);
 ENT.Roll = 0;
 ENT.YawAccel = 0;
 ENT.num = 0;
-function ENT:PhysicsSimulate( phys, deltatime )
+function ENT:PhysicsSimulate( phys, deltatime, skip_trace )
+	local myTable = self:GetTable()
+
 	//if(IsValid(self.Pilot) and self.Pilot:KeyDown(IN_WALK)) then return end;
 	local UP = ZAxis;
-	local RIGHT = self.RightDir;
-	local FWD = self.FWDDir;
+	local RIGHT = myTable.RightDir;
+	local FWD = myTable.FWDDir;
 	local worldZ;
-	self:RunTraces();
+	if not skip_trace then
+		self:RunTraces();
+	end
 	
         
 	
-	if(!self.Tractored) then
-		if(self.Inflight and IsValid(self.Pilot)) then
+	if(!myTable.Tractored) then
+		local Pilot = myTable.Pilot
+		if(myTable.Inflight and IsValid(Pilot)) then
 			/*
 			local h = ((self.FrontTrace.HitPos.z - self:GetPos().z) + (self.MiddleTrace.HitPos.z - self:GetPos().z) + (self.BackTrace.HitPos.z - self:GetPos().z)) / 3;
 			if(h < -500) then
@@ -566,82 +580,87 @@ function ENT:PhysicsSimulate( phys, deltatime )
 			end
 			*/
 			
-			if(self.EngineOn) then
+			if(myTable.EngineOn) then
 				-- Accelerate
 				
-				if(self.Boosting) then
-					self.num = self.BoostSpeed;
-					util.ScreenShake(self.DriverChair:GetPos(),5,60,0.1,100)
-				elseif(self.Pilot:KeyDown(IN_RELOAD) and self.Pilot:KeyDown(IN_JUMP)) then
-					self.num = 0;
-				elseif(self.Pilot:KeyDown(IN_FORWARD)) then
-					self.num = self.num + self.ForwardSpeed/100;
-				elseif(self.Pilot:KeyDown(IN_BACK)) then
-					self.num = self.num - self.ForwardSpeed/100;
-				elseif(self.Pilot:KeyDown(IN_FORWARD) and self.Pilot:KeyDown(IN_SPEED) and self.SpeederClass == 2) then
-					self.num = self.num + self.BoostSpeed/100;
+				local num = myTable.num
+				local ForwardSpeed = myTable.ForwardSpeed
+				
+				if(myTable.Boosting) then
+					num = myTable.BoostSpeed;
+					util.ScreenShake(myTable.DriverChair:GetPos(),5,60,0.1,100)
+				elseif(Pilot:KeyDown(IN_RELOAD) and Pilot:KeyDown(IN_JUMP)) then
+					num = 0;
+				elseif(Pilot:KeyDown(IN_FORWARD)) then
+					num = num + ForwardSpeed/100;
+				elseif(Pilot:KeyDown(IN_BACK)) then
+					num = num - ForwardSpeed/100;
+				elseif(Pilot:KeyDown(IN_FORWARD) and Pilot:KeyDown(IN_SPEED) and myTable.SpeederClass == 2) then
+					num = num + myTable.BoostSpeed/100;
 				end
-				if(!self.Boosting) then
+				if(!myTable.Boosting) then
 					local min,max;
-					if(self.CanBack) then
-						min = self.ForwardSpeed/2 * -1;
+					if(myTable.CanBack) then
+						min = ForwardSpeed/2 * -1;
 					else
 						min = 0;
 					end
-					max = self.ForwardSpeed;
-					if(self.Pilot:KeyDown(IN_SPEED) and self.SpeederClass == 2) then
-						max = self.BoostSpeed;
+					max = ForwardSpeed;
+					if(Pilot:KeyDown(IN_SPEED) and myTable.SpeederClass == 2) then
+						max = myTable.BoostSpeed;
 					end
-					if(self.ForwardSpeed > 0) then
-						self.num = math.Clamp(self.num,min,max)
-					elseif(self.ForwardSpeed < 0) then
-						self.num = math.Clamp(self.num,max,min)
+					if(ForwardSpeed > 0) then
+						num = math.Clamp(num,min,max)
+					elseif(ForwardSpeed < 0) then
+						num = math.Clamp(num,max,min)
 					end
 				end				
-				self.Accel.FWD = math.Approach(self.Accel.FWD,self.num,self.AccelSpeed);
+				local myAccel = myTable.Accel
+				local myAccel_FWD = math.Approach(myAccel.FWD,num,myTable.AccelSpeed);
+				myAccel.FWD = myAccel_FWD
 				
-				self:SetNWInt("Speed",self.Accel.FWD);
-				if(IsValid(self.Pilot)) then
-					self.Pilot:SetNWInt("SW_Speeder_Speed",self.Accel.FWD);
-				end
+				myTable:SetNWInt("Speed",myAccel_FWD);
+				Pilot:SetNWInt("SW_Speeder_Speed",myAccel_FWD);
 				
-				if(self.Pilot:KeyDown(IN_MOVERIGHT)) then
-					self.YawAccel = -50 - (self.Accel.FWD/100);
-				elseif(self.Pilot:KeyDown(IN_MOVELEFT)) then
-					self.YawAccel = 50 + (self.Accel.FWD/100);
+				if(Pilot:KeyDown(IN_MOVERIGHT)) then
+					myTable.YawAccel = -50 - (myAccel_FWD/100);
+				elseif(Pilot:KeyDown(IN_MOVELEFT)) then
+					myTable.YawAccel = 50 + (myAccel_FWD/100);
 				else
-					self.YawAccel = 0;
-					ExtraRoll = 0;
+					myTable.YawAccel = 0;
+					myTable.ExtraRoll = 0;
 				end
 			
 				phys:Wake();
 
 
-				local ang = Angle(0,self:GetAngles().y+self.YawAccel,0);
-				ang = ang + self.ExtraRoll;
-				if(!self.WaterTrace.Hit and self.UseGroundTraces) then
-					ang = ang + (self.PitchMod or Angle(0,0,0));
+				local ang = Angle(0,self:GetAngles().y+myTable.YawAccel,0);
+				ang = ang + myTable.ExtraRoll;
+				if(!myTable.WaterTrace.Hit and myTable.UseGroundTraces) then
+					ang = ang + (myTable.PitchMod or Angle(0,0,0));
 				end		
 
 				worldZ = self:GetHover();
 
-				if(!self.CriticalDamage) then
+				if(!myTable.CriticalDamage) then
 					FlightPhys.angle = ang; --+ Vector(90 0, 0)							
-					FlightPhys.pos = Vector(self:GetPos().x,self:GetPos().y,worldZ)+(FWD*self.Accel.FWD)+(RIGHT*self.Accel.RIGHT)+(UP*self.Accel.UP);
+					FlightPhys.pos = Vector(self:GetPos().x,self:GetPos().y,worldZ)+(FWD*myAccel_FWD)+(RIGHT*myAccel.RIGHT)+(UP*myAccel.UP);
 				else
 					FlightPhys.angle = ang;
 					FlightPhys.pos = Vector(self:GetPos().x,self:GetPos().y,worldZ)+(FWD*-2000)			
 				end
 				FlightPhys.deltatime = deltatime;
 				phys:ComputeShadowControl(FlightPhys);
+				
+				myTable.num = num
 			end
 		else
-			if(self.ShouldStandby) then
+			if(myTable.ShouldStandby) then
 				
 				phys:Wake();
 				worldZ = self:GetHover(true);
 				FlightPhys.angle = Angle(0,self:GetAngles().y,0);
-				FlightPhys.pos = Vector(self:GetPos().x,self:GetPos().y,worldZ-(self.StandbyHoverAmount or (self.HoverAmount/1.5)));
+				FlightPhys.pos = Vector(self:GetPos().x,self:GetPos().y,worldZ-(myTable.StandbyHoverAmount or (myTable.HoverAmount/1.5)));
 				FlightPhys.deltatime = deltatime;
 				phys:ComputeShadowControl(FlightPhys);
 			end
@@ -670,12 +689,15 @@ function ENT:GetHover(standby)
 	if(not self.WaterTrace.Hit or (self.WaterTrace.Hit and self.FrontTrace.Hit and (self.WaterTrace.HitPos.z < self.FrontTrace.HitPos.z) and self:WaterLevel() < 1)) then
 		self.UseGroundTraces = true;
 		if(self.FrontTrace.Hit and self.BackTrace.Hit) then
+			local FrontTrace_HitPos_z = self.FrontTrace.HitPos.z
+			local BackTrace_HitPos_z = self.BackTrace.HitPos.z
+			local MiddleTrace_HitPos_z = self.MiddleTrace.HitPos.z
 			
 			if(!standby) then
-				if(self.FrontTrace.HitPos.z >= self.BackTrace.HitPos.z) then
-					self.HoverAmount = self.StartHover + (self.FrontTrace.HitPos.z - self.BackTrace.HitPos.z)*(self.HoverMod or 1);
+				if(FrontTrace_HitPos_z >= BackTrace_HitPos_z) then
+					self.HoverAmount = self.StartHover + (FrontTrace_HitPos_z - BackTrace_HitPos_z)*(self.HoverMod or 1);
 				else
-					self.HoverAmount = self.StartHover - (self.BackTrace.HitPos.z - self.FrontTrace.HitPos.z)*(self.HoverMod or 1);
+					self.HoverAmount = self.StartHover - (BackTrace_HitPos_z - FrontTrace_HitPos_z)*(self.HoverMod or 1);
 				end
 			else
 				self.HoverAmount = self.StartHover;
@@ -683,12 +705,12 @@ function ENT:GetHover(standby)
 			
 			self.HoverAmount = math.Clamp(self.HoverAmount,0,250);
 
-			if(self.FrontTrace.HitPos.z >= self.BackTrace.HitPos.z and self.FrontTrace.HitPos.z >= self.MiddleTrace.HitPos.z) then
-				worldZ = self.FrontTrace.HitPos.z+self.HoverAmount;
-			elseif(self.MiddleTrace.HitPos.z >= self.BackTrace.HitPos.z and self.MiddleTrace.HitPos.z >= self.FrontTrace.HitPos.z) then
-				worldZ = self.MiddleTrace.HitPos.z+self.HoverAmount;
-			elseif(self.BackTrace.HitPos.z >= self.FrontTrace.HitPos.z and self.BackTrace.HitPos.z >= self.MiddleTrace.HitPos.z) then
-				worldZ = self.BackTrace.HitPos.z+self.HoverAmount;
+			if(FrontTrace_HitPos_z >= BackTrace_HitPos_z and FrontTrace_HitPos_z >= MiddleTrace_HitPos_z) then
+				worldZ = FrontTrace_HitPos_z+self.HoverAmount;
+			elseif(MiddleTrace_HitPos_z >= BackTrace_HitPos_z and MiddleTrace_HitPos_z >= FrontTrace_HitPos_z) then
+				worldZ = MiddleTrace_HitPos_z+self.HoverAmount;
+			elseif(BackTrace_HitPos_z >= FrontTrace_HitPos_z and BackTrace_HitPos_z >= MiddleTrace_HitPos_z) then
+				worldZ = BackTrace_HitPos_z.z+self.HoverAmount;
 			end
 
 		end
@@ -703,14 +725,18 @@ function ENT:GetHover(standby)
 	end
 	
 	if(!self.NoWobble) then
-		if(self.StandbyHover <= -3) then
-			self.StandbyHoverMod = 1;
-		elseif(self.StandbyHover >= 3) then
-			self.StandbyHoverMod = -1;
+		local StandbyHover = self.StandbyHover
+		local StandbyHoverMod
+		if(StandbyHover <= -3) then
+			StandbyHoverMod = 1;
+		elseif(StandbyHover >= 3) then
+			StandbyHoverMod = -1;
 		end
-		self.StandbyHover = math.Approach(self.StandbyHover,3*self.StandbyHoverMod,0.025*self.StandbyHoverMod);
+		self.StandbyHoverMod = StandbyHoverMod
+		StandbyHover = math.Approach(StandbyHover,3*StandbyHoverMod,0.025*StandbyHoverMod);
+		self.StandbyHover = StandbyHover
 		
-		return worldZ + self.StandbyHover;
+		return worldZ + StandbyHover;
 	end
 	return worldZ;
 end
